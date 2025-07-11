@@ -10,406 +10,300 @@ Neste projeto, construiremos um **CRUD de Clientes**, explorando todas as camada
 
 ---
 
-## 🔁 Etapa 5: Camada de _Infrastructure_ — Criação do Adaptador _Repository_
+## 🔁 Etapa 6: Camada de _Infrastructure_ — Criação do Adaptador _Controller_
 
-Após modelarmos as classes de domínio `Customer` e `Address`, o caso de uso `CreateCustomerUseCase` e o adaptador de saída `AddressLookupOutputPort` para buscar o CEP, nosso próximo passo é criar o **adaptador da porta de saída** responsável por acessar o banco de dados. Esse adaptador será a implementação da interface `CustomerPersistenceOutputPort`.
-
--   Será feita uma **implementação concreta do repositório utilizando MongoDB**. `MongoCustomerRepositoryAdapter`
-
-Esse adaptador terá como responsabilidade realizar operações de persistência e consulta de dados no banco **MongoDB**, conforme definido pelo contrato da interface de saída.
-
----
-
----
-
-Ótima pergunta! Aqui estão os **objetivos da Etapa 5: Criação do Adaptador Repository na camada de Infrastructure**, considerando o uso do MongoDB e os princípios da arquitetura hexagonal:
+Após modelarmos as classes de domínio `Customer` e `Address`, o caso de uso `CreateCustomerUseCase` , adaptador de saída `AddressLookupOutputPort` para buscar o CEP, o **adaptador da porta de saída** responsável por acessar o banco de dados, nosso próximo passo é criar o **adaptador de entrada** responsável por inserir o cliente.
 
 ---
 
 ### 🎯 Objetivos da Etapa
 
--   ✅ **Implementar o adaptador da porta de saída `CustomerPersistenceOutputPort`**, criando a classe `MongoCustomerRepositoryAdapter` responsável por interagir com o banco de dados MongoDB.
-
--   ✅ **Garantir o isolamento do domínio em relação à tecnologia de persistência**, mantendo a independência da lógica de negócio em relação ao banco de dados utilizado.
-
--   ✅ **Facilitar testes e manutenção**, permitindo que a persistência possa ser facilmente substituída por outra tecnologia (como PostgreSQL, MySQL ou até armazenamento em memória) sem impactar o domínio ou os casos de uso.
-
--   ✅ **Aplicar os princípios da arquitetura hexagonal**, desacoplando o núcleo da aplicação das implementações externas.
-
--   ✅ **Encapsular a lógica de acesso ao banco de dados**, concentrando as operações de leitura e escrita em um único componente adaptador, tornando o código mais coeso e reutilizável.
-
 ---
 
-Perfeito! Abaixo está a versão **ajustada e didática** do tutorial, com explicações claras para iniciantes, seguindo a arquitetura hexagonal e usando Spring Boot + MongoDB:
+## ✏️ Parte 1: Criando a controller
 
----
-
-## ✅ Configuração da Camada de Persistência com MongoDB (Spring Data)
-
-Vamos configurar o MongoDB como banco de dados para persistir os dados da aplicação. Lembre-se: na arquitetura hexagonal, a **infraestrutura (banco de dados)** deve ser acessada apenas por **adaptadores**, e nunca diretamente pelo domínio ou pelos casos de uso.
-
----
-
-## ✏️ Parte 1: Configuração da URI do MongoDB
-
-Abra o arquivo `application.properties` ou `application.yml` dentro da pasta:
+Crie as entidades dentro do pacote de entrada controller:
 
 ```
-src/main/resources/
+src/main/java/com/example/hexagonal/infrastructure/adapter/input/controller
 ```
 
-E adicione a URI de conexão com o MongoDB:
-
-### Para `application.properties`:
-
-```properties
-spring.data.mongodb.uri=mongodb://localhost:27017/hexagonal
-```
-
-utilizaremos o de cima do que o arquivo yml
-
-### Para arquivos .yml `application.yml` (alternativa):
-
-```yaml
-spring:
-    data:
-        mongodb:
-            uri: mongodb://localhost:27017/hexagonal
-```
-
-Essa URI diz ao Spring Boot para se conectar a um banco MongoDB rodando localmente na porta 27017, usando o banco chamado `hexagonal`.
-
----
-
-## ✏️ Parte 2: Criação das classes **Entity**
-
-> No MongoDB, os dados são armazenados em coleções (semelhante a tabelas em bancos relacionais).
-> Essas entidades não fazem parte do **domínio**, pois estão ligadas à forma como os dados são **armazenados**, ou seja, pertencem à **camada de infraestrutura**.
-
-Crie as entidades dentro do pacote:
-
-```
-src/main/java/com/example/hexagonal/infrastructure/adapter/output/repository/entity
-```
-
-### `CustomerEntity.java`
+### `CustomerController.java`
 
 ```java
-package com.example.hexagonal.infrastructure.adapter.output.repository.entity;
+package com.example.hexagonal.infrastructure.adapter.input.controller;
 
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/v1/customers")
+public class CustomerController {
+
+    @PostMapping
+    public ResponseEntity<Void> createCustomer() {
+    }
+}
+```
+
+@RestController
+@RequestMapping("/api/v1/customers") para definir qual seria o path do nosso endpoint
+@PostMapping método para inserção
+
+Como parametro precisamos criar uma classe de request para pegarmos os dados que precisamos inserir na base de dados
+
+### Criando a classe de request:
+
+criar a pasta request e dentro dela crie a classe CustomerRequestDTO.java
+src/main/java/com/example/hexagonal/infrastructure/adapter/input/controller/request/CustomerRequestDTO.java
+
+```java
+package com.example.hexagonal.infrastructure.adapter.input.controller.request;
+
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
-@Document(collection = "customers") // Define o nome da coleção no MongoDB
-public class CustomerEntity {
+public class CustomerRequestDTO {
 
-    @Id
-    private String id;
-
+    @NotBlank
     private String name;
 
-    private AddressEntity address;
-
+    @NotBlank
     private String cpf;
 
-    private Boolean isValidCpf;
+    @NotBlank
+    private String zipCode;
 }
 ```
 
-Claro! Aqui está uma explicação objetiva e resumida:
+o id o mongo gera automatico
+o endereço buscaremos de acordo com o cep enviado.
 
----
-
-### 🔎 O que é `CustomerEntity.java`?
-
-A classe `CustomerEntity` representa **como o cliente será salvo no MongoDB**.
-
-Ela é uma **entidade da camada de infraestrutura**, usada apenas para persistência dos dados.
-
----
-
-### 🧱 Detalhes do código:
-
--   `@Document(collection = "customers")`: indica que os dados serão salvos na coleção `customers` no MongoDB.
--   `@Id`: define o campo `id` como identificador único do documento.
--   `AddressEntity`: endereço do cliente, definido como um objeto aninhado.
-
-> 💡 Essa classe não deve ser usada no domínio. Ela é específica para o banco de dados.
-
-Vamos agora criar a classe `AddressEntity.java`
-
-### `AddressEntity.java`
-
-```java
-package com.example.hexagonal.infrastructure.adapter.output.repository.entity;
-
-import lombok.Data;
+Estes serão os dados que vamos receber por parâmetros na minha requisição.
 
 @Data
-public class AddressEntity {
-    private String street;
-    private String city;
-    private String state;
+@NotBlank para validações
+
+Sim! ✅ A classe `CustomerRequestDTO` é um **DTO** — mais precisamente, um **Request DTO** (Data Transfer Object).
+
+---
+
+### 📌 O que é um DTO?
+
+Um **DTO (Data Transfer Object)** é uma classe usada para **transportar dados entre camadas**, especialmente **entre o mundo externo e a aplicação**.
+
+No seu caso, o `CustomerRequestDTO` é um DTO que representa os **dados recebidos na requisição HTTP**, ou seja, **o corpo da requisição (JSON)** enviado pelo cliente.
+
+---
+
+### ✅ Por que usar um Request DTO?
+
+-   **Evita acoplamento** entre a API e o domínio.
+-   Permite **validação** dos dados com anotações como `@NotBlank`.
+-   Facilita a manutenção e a separação de responsabilidades.
+-   Garante que a entrada da API seja controlada, limpa e validada antes de ser usada no `use case`.
+
+---
+
+### 📁 Onde ele é usado?
+
+O `CustomerRequestDTO` será utilizado no seu **controller**, assim:
+
+```java
+@PostMapping
+public ResponseEntity<Void> createCustomer(@RequestBody @Valid CustomerRequestDTO request) {
+    useCase.create(request.toDomain(), request.getZipCode());
+    return ResponseEntity.status(HttpStatus.CREATED).build();
 }
 ```
 
----
+CustomerRequestDTO request será um @RequestBody e para pegar as validações @Valid
+depois precisamos acessar nosso caso de uso para podermos inserir o cliente
+Porém não podemso acessar nosso caso de uso diretamente para não ter acoplamento, assim teremos que criar uma porta de entrada para acessarmos
 
-## ✏️ Parte 3: Criação da Interface de Repositório de mapeamento dos métodos de acesso ao MongoDB
+### Criando a porta de entrada para a controller na camada application:
 
-O **Spring Data MongoDB** precisa da **interface** para gerar automaticamente os métodos de acesso ao banco
+Em src/main/java/com/example/hexagonal/application/port/input
 
-### 📁 Caminho:
-
-```
-src/main/java/com/example/hexagonal/infrastructure/adapter/output/repository
-```
-
-### 🧱 Passo 1: Interface de Repositório
-
-Essa interface será usada pelo Spring Data para mapear automaticamente os métodos de acesso ao MongoDB:
-
-crie o arquivo MongoCustomerRepository.java em src/main/java/com/example/hexagonal/infrastructure/adapter/output/repository
+Crie uma nova interface CreateCustomerInputPort.java
 
 ```java
-package com.example.hexagonal.infrastructure.adapter.output.repository;
+package com.example.hexagonal.application.port.input;
 
-import com.example.hexagonal.infrastructure.adapter.output.repository.entity.CustomerEntity;
-import org.springframework.data.mongodb.repository.MongoRepository;
+import com.example.hexagonal.domain.Customer;
 
-public interface MongoCustomerRepository extends MongoRepository<CustomerEntity, String> {
+public interface CreateCustomerInputPort {
+
+    void create(Customer customer, String zipCode);
+
 }
 ```
 
----
+Assim nosso caso de uso terá que implementar esta porta para podermos acessar o método.
 
-### 🧱 Por que criar a `MongoCustomerRepository.java`?
+### Ajustando o caso de uso para implementar a porta de entrada da controller
 
-O **Spring Data MongoDB** precisa dessa **interface** para gerar automaticamente os métodos de acesso ao banco, como:
+Acesse : src/main/java/com/example/hexagonal/application/usecase/CreateCustomerUseCase.java
 
--   `save()`
--   `findById()`
--   `deleteById()`
--   `findAll()`
-
----
-
-### ✅ O que ela faz?
-
-Essa interface **conecta o Spring Boot ao MongoDB**, sem que você precise escrever consultas manuais.
-
-> Você só diz **qual entidade** (no caso, `CustomerEntity`) e o **tipo da chave** (`String`), e o Spring cuida do resto.
-
----
-
-### 📌 Em resumo:
-
-> A `MongoCustomerRepository` é a ponte que o Spring usa para ler e gravar clientes no MongoDB automaticamente.
-
-# Criando o adapatador da porta de saída (CustomerPersistenceOutputPort) de inserção do cliente
-
-## ✏️ Parte 3: Criação do Adaptador de Saída no repositório
-
-> A camada de aplicação já possui uma **porta de saída** chamada `CustomerPersistenceOutputPort`, que define o contrato para salvar o cliente.
-> Agora vamos criar sua implementação concreta, que **interage com o MongoDB**, chamada `MongoCustomerRepositoryAdapter`.
-
-### 🧱 Passo 1: Adaptador `MongoCustomerRepositoryAdapter`
-
-Crie o arquivo MongoCustomerRepositoryAdapter.java em:
-src/main/java/com/example/hexagonal/infrastructure/adapter/output/MongoCustomerRepositoryAdapter.java
-
-Agora sim, o **adaptador real** da porta de saída:
+Adicone: implements CreateCustomerInputPort no arquivo CreateCustomerUseCase.java
 
 ```java
-package com.example.hexagonal.infrastructure.adapter.output;
+public class CreateCustomerUseCase implements CreateCustomerInputPort
+```
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+```java
+package com.example.hexagonal.application.usecase;
 
+import com.example.hexagonal.application.port.input.CreateCustomerInputPort;
+import com.example.hexagonal.application.port.output.AddressLookupOutputPort;
 import com.example.hexagonal.application.port.output.CustomerPersistenceOutputPort;
 import com.example.hexagonal.domain.Customer;
-import com.example.hexagonal.infrastructure.adapter.output.repository.MongoCustomerRepository;
-import com.example.hexagonal.infrastructure.adapter.output.repository.entity.CustomerEntity;
-import com.example.hexagonal.infrastructure.adapter.output.repository.mapper.CustomerEntityMapper;
 
-// pensar em nomear MongoCreateCustomerRepositoryAdapter
-@Component
-public class MongoCustomerRepositoryAdapter implements CustomerPersistenceOutputPort {
+public class CreateCustomerUseCase implements CreateCustomerInputPort {
 
-    @Autowired
-    private MongoCustomerRepository repository;
+    private final AddressLookupOutputPort addressLookupOutputPort;
+    private final CustomerPersistenceOutputPort customerPersistenceOutputPort;
 
-    @Autowired
-    private CustomerEntityMapper mapper;
-
-    @Override
-    public void save(Customer customer) {
-        CustomerEntity entity = mapper.toCustomerEntity(customer);
-        repository.save(entity);
+    public CreateCustomerUseCase(AddressLookupOutputPort addressLookupOutputPort,
+            CustomerPersistenceOutputPort customerPersistenceOutputPort) {
+        this.addressLookupOutputPort = addressLookupOutputPort;
+        this.customerPersistenceOutputPort = customerPersistenceOutputPort;
     }
+
+    // this.cpfValidationMessagePort = cpfValidationMessagePort;
+
+    public void create(Customer customer, String zipCode) {
+        var address = addressLookupOutputPort.findByZipCode(zipCode);
+        customer.setAddress(address);
+        customerPersistenceOutputPort.save(customer);
+        // cpfValidationMessagePort.sendCpfForValidation(customer.getCpf());
+    }
+
 }
 ```
 
-Foi injetados o repositorio para o método utilizar o repository
+Agora já podemos injetar nossa porta de entrada (`CreateCustomerInputPort`) na controller para acessarmos o caso de uso
 
-@Component para a classe ser gerenciada pelo spring
+### Implementando o médodo da controller:
+
+Acesse: src/main/java/com/example/hexagonal/infrastructure/adapter/input/controller/CustomerController.java
+
+```java
 @Autowired
+    private CreateCustomerInputPort createCustomerInputPort;
 
-compare a diferença de utilização ou não decorator do spring boot.
-
-```java
-@Component
-public class MongoCustomerRepositoryAdapter implements CustomerPersistenceOutputPort {
-
-    private final MongoCustomerRepository repository;
-
-    private final CustomerEntityMapper mapper;
-
-    public MongoCustomerRepositoryAdapter(MongoCustomerRepository repository, CustomerEntityMapper mapper) {
-        this.repository = repository;
-        this.mapper = mapper;
-    }
-
-    @Override
-    public void save(Customer customer) {
-        CustomerEntity entity = mapper.toCustomerEntity(customer);
-        repository.save(entity);
-    }
-}
-```
-
-Oberve abaixo:
-
-```java
-@Override
-    public void save(Customer customer) {
-        MongoCustomerRepository.save();
-
+    @PostMapping
+    public ResponseEntity<Void> createCustomer(@Valid @RequestBody CustomerRequestDTO customerRequestDTO) {
+        createCustomerInputPort.create();
     }
 ```
 
-Quando criamos o MongoCustomerRepository, criamos as classe de entidades CustomerEntity e AddressEntity
-A classe CustomerEntity que será salva na base de dados.
-Para que possamos salvar, tereos que criar um mapper para transforma customer em CustomerEntity
+Veja que precisaremos de customer como parâmetro em createCustomerInputPort.create() e não um customerRequestDTO
+então precisremos criar um mapper para transformar CustomerRequestDTO em customer
+
+### Criando o mapper:
+
+Crie a pasta mapper em src/main/java/com/example/hexagonal/infrastructure/adapter/input/controller/mapper
+Dentro de mapper crie uma interface chamado de CustomerMapper
+src/main/java/com/example/hexagonal/infrastructure/adapter/input/controller/mapper/CustomerMapper.java
+
+Observe que o
+
+-   CustomerRequestDTO tem name, cpf e zipCode e o
+-   Customer tem id name, address, cpf e isValidCpf
+
+precisamos ignorar os campos is, address e isValidCpf se não dará erro ( com o @Mapping)
 
 ```java
- @Override
-    public void save(Customer customer) {
-        CustomerEntity entity = mapper.toCustomerEntity(customer);
-        repository.save(entity);
-    }
-```
+package com.example.hexagonal.infrastructure.adapter.input.controller.mapper;
 
-Assim está pronto no adapatador de inserção de cliente
-
----
-
-## ✅ Observação sobre o Mapper
-
-Como estamos convertendo entre `Customer` (domínio) e `CustomerEntity` (infra), é recomendado criar um **mapper**.
-
----
-
-## 🛠️ Crie o arquivo:
-
-`src/main/java/com/example/hexagonal/infrastructure/adapter/output/repository/mapper/CustomerEntityMapper.java`
-
-Usando o Spring boot:
-
-```java
-package com.example.hexagonal.infrastructure.adapter.output.repository.mapper;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 import com.example.hexagonal.domain.Customer;
-import com.example.hexagonal.infrastructure.adapter.output.repository.entity.CustomerEntity;
-import org.mapstruct.Mapper;
+import com.example.hexagonal.infrastructure.adapter.input.controller.request.CustomerRequestDTO;
 
 @Mapper(componentModel = "spring")
-public interface CustomerEntityMapper {
+public interface CustomerMapper {
 
-    // eu recebo um Customer e retorno um CustomerEntity
-    CustomerEntity toCustomerEntity(Customer customer);
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "address", ignore = true)
+    @Mapping(target = "isValidCpf", ignore = true)
+
+    Customer toCustomer(CustomerRequestDTO customerRequest);
 
 }
 ```
 
-Vamos optar com spring boot, mas veja o sem Spring boot:
+Podemos agora injetar o CustomerMapper na controller e incluir no método
 
 ```java
-package com.example.hexagonal.infrastructure.adapter.output.repository.mapper;
+package com.example.hexagonal.infrastructure.adapter.input.controller;
 
-import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import com.example.hexagonal.domain.Address;
-import com.example.hexagonal.domain.Customer;
-import com.example.hexagonal.infrastructure.adapter.output.repository.entity.AddressEntity;
-import com.example.hexagonal.infrastructure.adapter.output.repository.entity.CustomerEntity;
+import com.example.hexagonal.application.port.input.CreateCustomerInputPort;
+import com.example.hexagonal.infrastructure.adapter.input.controller.mapper.CustomerMapper;
+import com.example.hexagonal.infrastructure.adapter.input.controller.request.CustomerRequestDTO;
 
-@Component
-public class CustomerEntityMapper {
+import jakarta.validation.Valid;
 
-    // Domínio -> Entidade (para salvar no banco)
-    public CustomerEntity toEntity(Customer customer) {
-        AddressEntity addressEntity = new AddressEntity();
-        addressEntity.setStreet(customer.getAddress().getStreet());
-        addressEntity.setCity(customer.getAddress().getCity());
-        addressEntity.setState(customer.getAddress().getState());
+@RestController
+@RequestMapping("/api/v1/customers")
+public class CustomerController {
 
-        CustomerEntity entity = new CustomerEntity();
-        entity.setId(customer.getId());
-        entity.setName(customer.getName());
-        entity.setCpf(customer.getCpf());
-        entity.setIsValidCpf(customer.getIsValidCpf());
-        entity.setAddress(addressEntity);
+    @Autowired
+    private CreateCustomerInputPort createCustomerInputPort;
 
-        return entity;
-    }
+    @Autowired
+    private CustomerMapper customerMapper;
 
-    // Entidade -> Domínio (para uso na aplicação)
-    public Customer toDomain(CustomerEntity entity) {
-        Address address = new Address();
-        address.setStreet(entity.getAddress().getStreet());
-        address.setCity(entity.getAddress().getCity());
-        address.setState(entity.getAddress().getState());
-
-        Customer customer = new Customer();
-        customer.setId(entity.getId());
-        customer.setName(entity.getName());
-        customer.setCpf(entity.getCpf());
-        customer.setIsValidCpf(entity.getIsValidCpf());
-        customer.setAddress(address);
-
-        return customer;
+    @PostMapping
+    public ResponseEntity<Void> createCustomer(@Valid @RequestBody CustomerRequestDTO customerRequestDTO) {
+        var customer = customerMapper.toCustomer(customerRequestDTO);
+        createCustomerInputPort.create(customer, customerRequestDTO.getZipCode());
+        return ResponseEntity.ok().build();
     }
 }
 ```
 
 ---
 
-### ✅ O que faz o `CustomerEntityMapper`?
-
-| Método       | Função                                                                                  |
-| ------------ | --------------------------------------------------------------------------------------- |
-| `toEntity()` | Converte um `Customer` (domínio) em `CustomerEntity` (infra) para **salvar no banco**   |
-| `toDomain()` | Converte um `CustomerEntity` (infra) em `Customer` (domínio) para **usar na aplicação** |
-
-> 💡 Ele mantém o **domínio independente da tecnologia de persistência**, seguindo a proposta da arquitetura hexagonal.
-
----
-
-## ✏️ Parte 4: Criar um teste de integração real (chamando a API)
+## ✏️ Parte 2: Criar um teste de integração real da controller
 
 Em construção
 
 ### 📌 Próximos passos:
 
-7. **Criar o Controller (porta de entrada)**
+7. **Criar o CRUD (Read, Update. Delete)**
 
-    - Para expor o endpoint REST e permitir a criação de clientes via HTTP.
+    - Desafio para vocês incrementarem o Read, Update. Delete
+    - Buscar o cliente por id
+    - Buscar a lista de cliente
+    - Atualizar os dados do cliente
+    - Deletar o cliente
+
+    Dica: crie primeiro o usecase, depois o adapter e depois o controller
+
+8. **Criação das configurações**
+
+    - Criando os beans do CRUD
+    - Criando as configurações do Kafla
+
+9. **Criação do producer e consumer do kafka**
+
+10. **Configuração do ambeinte para rodar a aplicação**
+
+11. **Proteção da Arquitetura**
 
 ---
-
-Se quiser, posso escrever a estrutura da classe `CreateCustomerUseCase` para você com exemplos. Deseja isso?
 
 https://github.com/DaniloArantesSilva/hexagonal-architecture

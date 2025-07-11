@@ -1,10 +1,11 @@
 package com.example.hexagonal.application.usecase;
 
+import com.example.hexagonal.application.port.input.CreateCustomerInputPort;
 import com.example.hexagonal.application.port.output.AddressLookupOutputPort;
 import com.example.hexagonal.application.port.output.CustomerPersistenceOutputPort;
 import com.example.hexagonal.domain.Customer;
 
-public class CreateCustomerUseCase {
+public class CreateCustomerUseCase implements CreateCustomerInputPort {
 
     private final AddressLookupOutputPort addressLookupOutputPort;
     private final CustomerPersistenceOutputPort customerPersistenceOutputPort;
